@@ -103,8 +103,17 @@ export async function exportEverythingToFiles(
     );
     delete exportData.meta;
     const baseDirectory = getWorkingDirectory(true);
+    
+    // Check if we have any exportable data
+    const hasGlobalData = exportData.global && Object.keys(exportData.global).length > 0;
+    const hasRealmData = exportData.realm && Object.keys(exportData.realm).length > 0;
+    
+    if (!hasGlobalData && !hasRealmData) {
+      printError(new Error('No exportable configuration data found. This may be due to insufficient permissions or environment limitations.'));
+      return false;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Object.entries(exportData.global).forEach(([type, obj]: [string, any]) =>
+    Object.entries(exportData.global || {}).forEach(([type, obj]: [string, any]) =>
       exportItem(
         exportData.global,
         type,
@@ -116,7 +125,7 @@ export async function exportEverythingToFiles(
         separateObjects
       )
     );
-    Object.entries(exportData.realm).forEach(([realm, data]: [string, any]) =>
+    Object.entries(exportData.realm || {}).forEach(([realm, data]: [string, any]) =>
       Object.entries(data).forEach(([type, obj]: [string, any]) =>
         exportItem(
           data,

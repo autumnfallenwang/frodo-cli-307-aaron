@@ -13,9 +13,10 @@ export function cloneDeep(obj: any): any {
 
 /**
  * Result callback that handles errors when they occur by printing them and setting the process exit code
- * @param error The error to handle
+ * @param error The error to handle  
+ * @param result The result (unused in error cases)
  */
-export function errorHandler(error?: FrodoError) {
+export function errorHandler(error: Error | undefined, _result: any) {
   if (!error) return;
   printError(error);
   process.exitCode = 1;
