@@ -106,7 +106,8 @@ export async function exportConfigEntityToFile(
   envFile?: string,
   separateMappings: boolean = false,
   separateObjects: boolean = false,
-  includeMeta: boolean = true
+  includeMeta: boolean = true,
+  extract: boolean = false
 ): Promise<boolean> {
   try {
     const options = getIdmImportExportOptions(undefined, envFile);
@@ -129,6 +130,9 @@ export async function exportConfigEntityToFile(
         includeMeta
       );
       return true;
+    }
+    if (extract) {
+      extractEndpointsToFiles(exportData, id);
     }
     let fileName = file;
     if (!fileName) {
@@ -221,7 +225,8 @@ export async function exportAllConfigEntitiesToFiles(
   envFile?: string,
   separateMappings: boolean = false,
   separateObjects: boolean = false,
-  includeMeta: boolean = true
+  includeMeta: boolean = true,
+  extract: boolean = false
 ): Promise<boolean> {
   const errors: Error[] = [];
   try {
@@ -233,6 +238,9 @@ export async function exportAllConfigEntitiesToFiles(
       },
       errorHandler
     );
+    if (extract) {
+      extractEndpointsToFiles(exportData);
+    }
     for (const [id, obj] of Object.entries(exportData.idm)) {
       try {
         if (separateMappings && id === 'sync') {
@@ -722,4 +730,49 @@ export function getManagedObjectsFromFiles(
     }
   }
   return managed;
+}
+
+/**
+ * Extract JavaScript from IDM endpoint configurations and save to separate files
+ * @param {ConfigEntityExportInterface} endpointExport IDM export data containing endpoint configurations
+ * @param {string} endpointId Optional specific endpoint ID to extract
+ * @param {string} directory Optional directory to save extracted files
+ * @param {boolean} useEndpointNamesForFiles Whether to use endpoint names for file names (default: true)
+ * @returns {boolean} true if successful, false otherwise
+ */
+export function extractEndpointsToFiles(
+  endpointExport: ConfigEntityExportInterface,
+  endpointId?: string,
+  directory?: string,
+  useEndpointNamesForFiles: boolean = true
+): boolean {
+  try {
+    const endpoints = endpointId
+      ? [endpointExport.idm[endpointId]]
+      : Object.values(endpointExport.idm).filter(
+          (entity) => 
+            entity._id?.startsWith('endpoint/') && 
+            entity.type === 'text/javascript' &&
+            entity.source
+        );
+    
+    for (const endpoint of endpoints) {
+      const fileExtension = 'js'; // IDM endpoints are always JavaScript
+      const endpointName = endpoint._id?.replace('endpoint/', '') || endpoint._id;
+      const endpointFileName = getTypedFilename(
+        useEndpointNamesForFiles ? endpointName : endpoint._id,
+        'idm',
+        fileExtension
+      );
+      const endpointSource = endpoint.source;
+      
+      // Extract the source code to a separate file and replace with file reference
+      const endpointDirectory = directory ? `${directory}/endpoint` : 'endpoint';
+      endpoint.source = extractDataToFile(endpointSource, endpointFileName, endpointDirectory);
+    }
+    return true;
+  } catch (error) {
+    printError(error);
+  }
+  return false;
 }

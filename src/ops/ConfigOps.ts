@@ -17,7 +17,7 @@ import {
 } from '../utils/Config';
 import { cleanupProgressIndicators, printError } from '../utils/Console';
 import { saveServersToFiles } from './classic/ServerOps';
-import { ManagedSkeleton, writeManagedJsonToDirectory } from './IdmOps';
+import { ManagedSkeleton, writeManagedJsonToDirectory, extractEndpointsToFiles } from './IdmOps';
 import { writeSyncJsonToDirectory } from './MappingOps';
 import { extractScriptsToFiles } from './ScriptOps';
 import { errorHandler } from './utils/OpsUtils';
@@ -262,6 +262,15 @@ export function exportItem(
       includeMeta
     );
   } else {
+    // Extract IDM endpoints if extraction is enabled
+    if (extract && type === 'idm') {
+      extractEndpointsToFiles(
+        { idm: obj },
+        undefined,
+        `${baseDirectory.substring(getWorkingDirectory(false).length + 1)}/idm`
+      );
+    }
+    
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Object.entries(obj).forEach(([id, value]: [string, any]) => {
       if (type === 'idm') {
@@ -322,6 +331,13 @@ export function exportItem(
             exportData as ScriptExportInterface,
             id,
             `${baseDirectory.substring(getWorkingDirectory(false).length + 1)}/${fileType}`
+          );
+        }
+        if (extract && type === 'idm') {
+          extractEndpointsToFiles(
+            exportData,
+            id,
+            `${baseDirectory.substring(getWorkingDirectory(false).length + 1)}`
           );
         }
         if (!fs.existsSync(`${baseDirectory}/${fileType}`)) {

@@ -42,7 +42,7 @@ export default function setup() {
     .addOption(
       new Option(
         '-x, --extract',
-        'Extract scripts and server properties from the exported file, and save it to a separate file. Ignored with -a.'
+        'Extract scripts, IDM endpoint JavaScript, and server properties from the exported file, and save them to separate files. Ignored with -a.'
       )
     )
     .addOption(
@@ -113,7 +113,7 @@ export default function setup() {
         ] +
         `Usage Examples:\n` +
         `  Export global and realm configuration for version control (e.g. Git) into the current directory.\n` +
-        `  Note that -x and -s separates script and mapping config to better track changes made to them, and -N removes metadata since it changes every export (you may consider using --no-coords as well if you don't care to track node positions in journeys):\n` +
+        `  Note that -x and -s separates script, IDM endpoint, and mapping config to better track changes made to them, and -N removes metadata since it changes every export (you may consider using --no-coords as well if you don't care to track node positions in journeys):\n` +
         `  $ frodo config export -sxAND . ${s.connId}\n`['brightCyan'] +
         `  Export global and realm configuration from cloud to be later imported into a classic, on-prem deployment.\n` +
         `  Note -dR is used for exporting all read-only config from cloud since certain cloud read-only config (like the realm config) can be imported into a classic on-prem deployment:\n` +
