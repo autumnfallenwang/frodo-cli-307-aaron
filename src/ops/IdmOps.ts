@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import propertiesReader from 'properties-reader';
 
-import { extractDataToFile, getExtractedJsonData } from '../utils/Config';
+import { extractDataToFile, getExtractedJsonData, getExtractedData } from '../utils/Config';
 import {
   createProgressIndicator,
   printError,
@@ -319,7 +319,7 @@ export async function importConfigEntityByIdFromFile(
       ]);
       importData = { idm: { managed: managedData } };
     } else {
-      importData = JSON.parse(fileData);
+      importData = getIdmConfigWithReconstructedEndpoints(filePath);
     }
 
     const options = getIdmImportExportOptions(undefined, envFile);
@@ -389,8 +389,9 @@ export async function importFirstConfigEntityFromFile(
       path.resolve(process.cwd(), filePath),
       'utf8'
     );
+    const idmConfig = getIdmConfigWithReconstructedEndpoints(filePath);
     const entities = Object.values(
-      JSON.parse(fileData).idm
+      idmConfig.idm
     ) as IdObjectSkeletonInterface[];
     if (entities.length === 0) {
       stopProgressIndicator(indicatorId, `No items to import.`, 'success');
@@ -459,7 +460,7 @@ export async function importAllConfigEntitiesFromFile(
   let filePath;
   try {
     filePath = getFilePath(file);
-    const importData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const importData = getIdmConfigWithReconstructedEndpoints(filePath);
     indicatorId = createProgressIndicator(
       'indeterminate',
       0,
@@ -618,8 +619,9 @@ export async function getIdmImportDataFromIdmDirectory(
       !f.path.endsWith('managed.idm.json') &&
       f.path.endsWith('.idm.json')
   )) {
+    const idmConfig = getIdmConfigWithReconstructedEndpoints(f.path);
     const entities = Object.values(
-      JSON.parse(f.content).idm
+      idmConfig.idm
     ) as unknown as IdObjectSkeletonInterface[];
     for (const entity of entities) {
       importData.idm[entity._id] = entity;
@@ -767,7 +769,11 @@ export function extractEndpointsToFiles(
       const endpointSource = endpoint.source;
       
       // Extract the source code to a separate file and replace with file reference
-      const endpointDirectory = directory ? `${directory}/endpoint` : 'endpoint';
+      // For single endpoint exports, put JS file in same directory as JSON
+      // For bulk exports, organize in endpoint/ subfolder
+      const endpointDirectory = endpointId 
+        ? (directory || '.') 
+        : (directory ? `${directory}/endpoint` : 'endpoint');
       endpoint.source = extractDataToFile(endpointSource, endpointFileName, endpointDirectory);
     }
     return true;
@@ -775,4 +781,46 @@ export function extractEndpointsToFiles(
     printError(error);
   }
   return false;
+}
+
+/**
+ * Reconstructs IDM config from a JSON file by reading extracted .idm.js files
+ * @param {string} filePath The path to the IDM config JSON file
+ * @returns {ConfigEntityExportInterface} The IDM config with reconstructed endpoint source code
+ */
+export function getIdmConfigWithReconstructedEndpoints(
+  filePath: string
+): ConfigEntityExportInterface {
+  const fileData = fs.readFileSync(filePath, 'utf8');
+  const idmConfig: ConfigEntityExportInterface = JSON.parse(fileData);
+  
+  // Find the directory containing the JSON file
+  const directory = filePath.substring(0, filePath.lastIndexOf('/'));
+  
+  // Process each IDM entity to check for extracted endpoints
+  for (const [entityId, entity] of Object.entries(idmConfig.idm)) {
+    // Check if this is an endpoint with extracted source
+    if (entityId.startsWith('endpoint/') && 
+        entity.type === 'text/javascript' && 
+        typeof entity.source === 'string' && 
+        entity.source.startsWith('file://')) {
+      
+      try {
+        // Read the extracted JavaScript from the .idm.js file
+        const extractedSource = getExtractedData(entity.source, directory);
+        if (extractedSource) {
+          // Replace the file reference with the actual source code
+          entity.source = extractedSource;
+        }
+      } catch (error) {
+        // If we can't read the .idm.js file, leave the file reference as-is
+        // and let the import process handle the missing file error
+        printError(
+          new Error(`Warning: Could not read extracted file for endpoint ${entityId}: ${error.message}`)
+        );
+      }
+    }
+  }
+  
+  return idmConfig;
 }
